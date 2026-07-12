@@ -20,11 +20,43 @@ const ComplaintDetail = () => {
   const [evidenceChecked, setEvidenceChecked] = useState({});
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [noticeText, setNoticeText] = useState('');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedAdvocate, setSelectedAdvocate] = useState(null);
+  const [advocateRating, setAdvocateRating] = useState(5);
+  const [reviewTextContent, setReviewTextContent] = useState('');
+  const [advocateReviewsMap, setAdvocateReviewsMap] = useState({});
 
   // Chat States
   const [chatMessage, setChatMessage] = useState('');
   const [sendingChat, setSendingChat] = useState(false);
   const chatEndRef = useRef(null);
+
+  const fetchAdvocateRating = async (advocateId) => {
+    try {
+      const res = await api.get(`/advocates/${advocateId}/reviews`);
+      if (res.data.success) {
+        setAdvocateReviewsMap(prev => ({
+          ...prev,
+          [advocateId]: {
+            averageRating: res.data.averageRating,
+            reviews: res.data.reviews
+          }
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (complaint?.advocateReplies?.length > 0) {
+      complaint.advocateReplies.forEach(reply => {
+        if (reply.advocate?._id) {
+          fetchAdvocateRating(reply.advocate._id);
+        }
+      });
+    }
+  }, [complaint]);
 
   const handleOpenNoticeModal = () => {
     if (!complaint) return;
@@ -566,13 +598,32 @@ ${complaint.citizen?.username || 'Grievant'}
                               {reply.advocate?.username?.[0].toUpperCase() || 'A'}
                             </div>
                           )}
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                              Advocate {reply.advocate?.username || 'Counsel'}
-                            </h4>
-                            <span className="text-[10px] text-slate-400 block font-medium">
-                              {new Date(reply.replyDate).toLocaleString()}
-                            </span>
+                          <div className="flex-1 flex justify-between items-center">
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                Advocate {reply.advocate?.username || 'Counsel'}
+                                {advocateReviewsMap[reply.advocate?._id] && (
+                                  <span className="text-[10px] text-amber-500 flex items-center gap-0.5 font-bold">
+                                    ★ {advocateReviewsMap[reply.advocate._id].averageRating} ({advocateReviewsMap[reply.advocate._id].reviews.length} reviews)
+                                  </span>
+                                )}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 block font-medium">
+                                {new Date(reply.replyDate).toLocaleString()}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedAdvocate(reply.advocate);
+                                setAdvocateRating(5);
+                                setReviewTextContent('');
+                                setShowReviewModal(true);
+                              }}
+                              className="text-[10px] text-primary-500 hover:underline font-bold px-3 py-1.5 rounded-lg border border-primary-500/10 hover:bg-primary-500/5 transition-all"
+                            >
+                              Rate Advocate
+                            </button>
                           </div>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-slate-100 dark:border-slate-800/80">
@@ -673,6 +724,77 @@ ${complaint.citizen?.username || 'Grievant'}
                 <Download className="w-4 h-4" /> Download Notice (.TXT)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Rate Advocate Modal Overlay */}
+      {showReviewModal && selectedAdvocate && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/75 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white dark:bg-darkCard rounded-3xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 md:p-8 space-y-6 shadow-2xl relative">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+              <h3 className="text-sm font-bold">Rate Advocate: {selectedAdvocate.username}</h3>
+              <button 
+                onClick={() => { setShowReviewModal(false); setSelectedAdvocate(null); }}
+                className="p-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-450 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const res = await api.post(`/advocates/${selectedAdvocate._id}/reviews`, {
+                  rating: advocateRating,
+                  reviewText: reviewTextContent
+                });
+                if (res.data.success) {
+                  showToast(res.data.message, 'success');
+                  setShowReviewModal(false);
+                  setReviewTextContent('');
+                  fetchAdvocateRating(selectedAdvocate._id);
+                }
+              } catch (err) {
+                showToast(err.response?.data?.message || 'Submission failed.', 'error');
+              }
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase">Star Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setAdvocateRating(star)}
+                      className={`text-xl transition-all ${
+                        star <= advocateRating ? 'text-amber-500 scale-110' : 'text-slate-350 dark:text-slate-700'
+                      }`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase">Your Review Message</label>
+                <textarea
+                  value={reviewTextContent}
+                  onChange={(e) => setReviewTextContent(e.target.value)}
+                  required
+                  rows="4"
+                  placeholder="Share your experience consulting with this advocate..."
+                  className="w-full p-3 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 resize-none text-slate-700 dark:text-slate-300"
+                ></textarea>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-md transition-all"
+              >
+                Submit Review
+              </button>
+            </form>
           </div>
         </div>
       )}

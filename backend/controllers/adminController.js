@@ -58,6 +58,13 @@ const getDashboardStats = async (req, res, next) => {
       };
     });
 
+    // 4.5. State-wise aggregation for Geo-distribution charts (Heatmap)
+    const stateData = await Complaint.aggregate([
+      { $group: { _id: '$state', count: { $sum: 1 } } },
+      { $project: { state: '$_id', count: 1, _id: 0 } },
+      { $sort: { count: -1 } }
+    ]);
+
     // 5. Recent Activity
     const recentFeedbacks = await Feedback.find()
       .populate('user', 'username email')
@@ -76,7 +83,8 @@ const getDashboardStats = async (req, res, next) => {
       charts: {
         categories: categoriesData,
         statuses: statusesData,
-        trends: trendsData
+        trends: trendsData,
+        states: stateData
       },
       recentFeedbacks
     });

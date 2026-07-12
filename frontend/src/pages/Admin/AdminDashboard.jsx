@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
-  CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell 
+  CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar 
 } from 'recharts';
 
 const AdminDashboard = () => {
@@ -18,6 +18,7 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState({ totalUsers: 0, totalComplaints: 0, activeAdvocates: 0, pendingComplaints: 0, resolvedComplaints: 0 });
   const [categoriesData, setCategoriesData] = useState([]);
   const [trendsData, setTrendsData] = useState([]);
+  const [statesData, setStatesData] = useState([]);
   const [recentFeedbacks, setRecentFeedbacks] = useState([]);
 
   const fetchDashboardData = async () => {
@@ -28,6 +29,7 @@ const AdminDashboard = () => {
         setStats(res.data.stats);
         setCategoriesData(res.data.charts.categories || []);
         setTrendsData(res.data.charts.trends || []);
+        setStatesData(res.data.charts.states || []);
         setRecentFeedbacks(res.data.recentFeedbacks || []);
       }
     } catch (err) {
@@ -205,6 +207,31 @@ const AdminDashboard = () => {
               </>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Geographical State-wise Grievance distribution (Heatmap) */}
+      <div className="p-6 border border-slate-200 dark:border-slate-800 bg-white dark:bg-darkCard rounded-3xl shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-slate-850 dark:text-white flex items-center gap-2">
+          <Layers className="w-4.5 h-4.5 text-primary-500" /> State-wise Grievance Distribution
+        </h3>
+        <p className="text-[10px] text-slate-405 font-medium leading-relaxed">
+          Aggregated distribution of case filings across regions. Darker bars indicate areas with higher dispute counts (Heatmap).
+        </p>
+        <div className="h-64 w-full text-xs">
+          {statesData.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-slate-400">No regional data logged.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={statesData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3b82f61a" />
+                <XAxis dataKey="state" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" allowDecimals={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#f8fafc' }} />
+                <Bar dataKey="count" fill="#4f46e5" radius={[8, 8, 0, 0]} maxBarSize={55} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 

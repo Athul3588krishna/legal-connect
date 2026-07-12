@@ -9,8 +9,8 @@ We successfully scaffolded, coded, and integrated both the frontend and backend 
 ### 1. Backend Service Layer (`/backend`)
 - **Server Entry (`server.js`)**: Coordinates routers, initializes Mongoose database, logs static asset paths, and enforces rate limit rules.
 - **Config & DB Connection (`config/db.js`, `config/gemini.js`)**: Establishes connections to MongoDB and initiates the Google Gemini API client with a fallback mock system.
-- **Database Models (`models/User.js`, `models/Complaint.js`, `models/Notification.js`, `models/Feedback.js`)**: Defines schemas for JWT sessions, structured AI legal guidelines, advocate advice logs, in-app notifications, and citizen ratings.
-- **API Controllers & Routes (`controllers/`, `routes/`)**: Implements clean architecture REST modules for JWT auth, password resets, citizen submissions, follow-up chats, advocate responses, admin charts aggregation, and notification markings.
+- **Database Models (`models/User.js`, `models/Complaint.js`, `models/Notification.js`, `models/Feedback.js`, `models/Support.js`, `models/AdvocateReview.js`)**: Defines schemas for JWT sessions, structured AI legal guidelines, advocate advice logs, in-app notifications, citizen ratings, contact support requests, and advocate profile reviews.
+- **API Controllers & Routes (`controllers/`, `routes/`)**: Implements clean architecture REST modules for JWT auth, password resets, citizen submissions, follow-up chats, advocate responses, admin charts aggregation, support ticket auditing, and advocate feedback loops.
 - **Middlewares (`middleware/`)**: Formulates security limit protections including rate-limit boundaries, file uploads validation using Multer, and role-based permissions (Citizen, Advocate, Admin).
 - **PDF Report Compiler (`services/pdfService.js`)**: Standardizes case summaries, statutes, procedure timelines, and disclaimer requirements into elegant, download-streamed PDF documents using `pdfkit`.
 
@@ -21,14 +21,16 @@ We successfully scaffolded, coded, and integrated both the frontend and backend 
 - **View Portals (`pages/`)**:
   - *Public*: Landing Page (Timelines, Heroes), About, Services list, FAQ accordions, and Contact forms.
   - *Auth*: Login, Register, Forgot Password, Reset Password, and Verify Email.
-  - *Citizen*: Dashboard stats, file upload lodge forms, evidence check-offs (saved to local storage), and follow-up Gemini chat logs.
+  - *Citizen*: Dashboard stats, file upload lodge forms, evidence check-offs (saved to local storage), follow-up Gemini chat logs, and advocate review submission panels.
   - *Advocate*: Case directories (Open/Responded) and Guidance workspaces.
-  - *Admin*: Analytics dashboards drawing Recharts distribution pies/line charts, role managers, and feedback audit boards.
+  - *Admin*: Analytics dashboards drawing Recharts distribution pies/line charts, geographical distribution heatmap bar charts, user profile controllers, and feedback/support auditors.
 
 ### 🌟 3. Premium Interactive Additions (New!)
 - **🎤 Speech-to-Text Dictation**: Incorporated Web Speech API inside the complaint details form (`SubmitComplaint.jsx`), allowing users to speak their grievance naturally and translate voice input to text.
 - **📖 Hover-based Legal Dictionary (De-Legalese)**: Built a dynamic translation parser (`DeLegaleseText.jsx`) that underlines complex legalese terms in the AI report and shows definitions in tooltips upon hovering.
 - **📄 AI Legal Notice Draft Builder**: Created a pre-filled legal warning notice generator modal (`ComplaintDetail.jsx`) that allows citizens to review, edit, copy, or download a formal letter draft for counterparties based on Gemini's analysis.
+- **⭐ Advocate Reviews & Ratings**: Implemented a comprehensive rating system (`AdvocateReview.js`, `advocateReviewRoutes.js`) allowing citizens to star-rate (1-5 stars) and review advocate profiles after a consultation.
+- **📊 Admin Geographical Grievance Map (Heatmap)**: Created an interactive regional distribution bar chart (`AdminDashboard.jsx`) using Recharts, grouping complaints by state (density-coded) to show areas of high dispute activity.
 
 ---
 
