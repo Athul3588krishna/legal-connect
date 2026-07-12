@@ -58,7 +58,7 @@ const SubmitComplaint = () => {
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingMessages = [
     "Uploading case documents and creating dossier...",
-    "Connecting with Google Gemini legal analysis engine...",
+    "Connecting with LegalAssist AI analysis engine...",
     "Classifying legal jurisdiction and researching statutory frameworks...",
     "Drafting step-by-step resolution procedures and document requirements...",
     "Compiling FAQ guides and wrapping final report..."
@@ -205,7 +205,7 @@ const SubmitComplaint = () => {
         <div className="border-b border-slate-100 dark:border-slate-800/60 pb-5">
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">File A Legal Grievance</h1>
           <p className="text-xs text-slate-450 dark:text-slate-400 mt-1">
-            Provide details of the dispute or legal grievance. Our Gemini AI engine will parse the issues and map remedies.
+            Provide details of the dispute or legal grievance. Our AI engine will parse the issues and map remedies.
           </p>
         </div>
 

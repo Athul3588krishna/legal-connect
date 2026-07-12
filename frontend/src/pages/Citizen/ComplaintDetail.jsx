@@ -487,7 +487,7 @@ ${complaint.citizen?.username || 'Grievant'}
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-darkCard/40 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Gemini Legal Assistant Online</span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">LegalAssist AI Assistant Online</span>
                 </div>
               </div>
 

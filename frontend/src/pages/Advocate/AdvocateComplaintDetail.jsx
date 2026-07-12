@@ -163,7 +163,7 @@ const AdvocateComplaintDetail = () => {
           {ai && (
             <div className="p-6 border border-slate-200 dark:border-slate-800 bg-white dark:bg-darkCard rounded-3xl space-y-4">
               <h3 className="text-sm font-bold text-slate-850 dark:text-white border-l-4 border-indigo-500 pl-3">
-                AI Guidance Reference (Generated via Gemini)
+                AI Guidance Reference (Generated via LegalAssist AI)
               </h3>
               
               <div className="space-y-4 text-xs">
@@ -286,7 +286,7 @@ const AdvocateComplaintDetail = () => {
                 {complaint.followUpChat.map((chat, idx) => (
                   <div key={idx} className="pt-3 first:pt-0 space-y-1">
                     <span className="font-bold text-[10px] text-slate-400 uppercase block">
-                      {chat.role === 'user' ? complaint.citizen?.username : 'Gemini AI Assistant'}
+                      {chat.role === 'user' ? complaint.citizen?.username : 'LegalAssist AI Assistant'}
                     </span>
                     <p className="text-slate-500 dark:text-slate-350 italic">
                       "{chat.message.substring(0, 150)}{chat.message.length > 150 ? '...' : ''}"

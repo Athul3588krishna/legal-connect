@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 @layer base {
   body {
@@ -48,5 +47,5 @@
 
 /* Glassmorphism utility card */
 .glass-panel {
-  @apply bg-white dark:bg-darkCard bg-opacity-70 dark:bg-opacity-80 backdrop-blur-md border border-slate-200 dark:border-slate-800;
+  @apply bg-white/70 dark:bg-darkCard/80 backdrop-blur-md border border-slate-200 dark:border-slate-800;
 }

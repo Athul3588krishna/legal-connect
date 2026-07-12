@@ -21,7 +21,7 @@ const LandingPage = () => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary-500/20 bg-primary-500/5 text-primary-600 dark:text-primary-400 text-xs font-semibold">
-            <Sparkles className="w-4 h-4" /> Powered by Google Gemini AI
+            <Sparkles className="w-4 h-4" /> LegalAssist AI Engine
           </div>
           
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-none max-w-4xl mx-auto">
@@ -129,7 +129,7 @@ const LandingPage = () => {
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-800 dark:text-white">AI Legal Analysis Dispatch</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
-                Google Gemini automatically aggregates the context, highlights the applicable acts or codes, suggests standard formats, and displays FAQs.
+                Our AI engine automatically aggregates the context, highlights the applicable acts or codes, suggests standard formats, and displays FAQs.
               </p>
             </div>
           </div>
