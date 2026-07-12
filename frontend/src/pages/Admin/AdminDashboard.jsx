@@ -86,6 +86,12 @@ const AdminDashboard = () => {
           >
             <MessageSquare className="w-3.5 h-3.5" /> Feedback Audit
           </Link>
+          <Link
+            to="/admin/support"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> Support Auditor
+          </Link>
         </div>
       </div>
 

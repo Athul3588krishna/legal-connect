@@ -5,8 +5,9 @@ import { ToastContext } from '../../context/ToastContext';
 import { AuthContext } from '../../context/AuthContext';
 import { 
   ArrowLeft, Download, Send, MessageSquare, ShieldAlert, FileText, 
-  HelpCircle, ChevronDown, ChevronUp, CheckSquare, Square, CheckCircle, Clock 
+  HelpCircle, ChevronDown, ChevronUp, CheckSquare, Square, CheckCircle, Clock, Copy, X
 } from 'lucide-react';
+import DeLegaleseText from '../../components/DeLegaleseText';
 
 const ComplaintDetail = () => {
   const { id } = useParams();
@@ -17,11 +18,74 @@ const ComplaintDetail = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ai_guide'); // ai_guide, chat, advocate_replies
   const [evidenceChecked, setEvidenceChecked] = useState({});
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [noticeText, setNoticeText] = useState('');
 
   // Chat States
   const [chatMessage, setChatMessage] = useState('');
   const [sendingChat, setSendingChat] = useState(false);
   const chatEndRef = useRef(null);
+
+  const handleOpenNoticeModal = () => {
+    if (!complaint) return;
+    
+    const formattedDate = new Date(complaint.createdAt).toLocaleDateString();
+    const lawsText = complaint.aiResponse?.applicableLaws?.map(l => `- ${l.law}`).join('\n') || '';
+    
+    const text = `FORMAL LEGAL NOTICE OF GRIEVANCE
+
+Date: ${formattedDate}
+
+From:
+Citizen Filer: ${complaint.citizen?.username || 'Grievant'}
+Location: ${complaint.district}, ${complaint.state}
+Contact Email: ${complaint.citizen?.email || 'N/A'}
+
+To:
+Respondent (Name of Business / Individual in Dispute)
+
+Subject: Notice of Legal Grievance and Demand for Redress
+
+Dear Sir/Madam,
+
+This is a formal communication notifying you of a legal grievance regarding the incident that occurred on or about ${new Date(complaint.incidentDate).toLocaleDateString()}. 
+
+Particulars of Grievance:
+"${complaint.description}"
+
+Please note that this matter has been evaluated and may involve violations under the following statutory frameworks:
+Classification: ${complaint.aiResponse?.classification || 'General Dispute'}
+Statutes and Codes:
+${lawsText}
+
+We hereby demand that you contact the undersigned within fifteen (15) business days of receiving this notice to resolve this dispute amicably. Failure to do so may compel the filing of a formal complaint with the suggested authority: ${complaint.aiResponse?.suggestedAuthority || 'the appropriate court or tribunal'}.
+
+This communication is sent without prejudice to any other rights or remedies available under law.
+
+Sincerely,
+_______________________________
+${complaint.citizen?.username || 'Grievant'}
+`;
+    setNoticeText(text);
+    setShowNoticeModal(true);
+  };
+
+  const handleCopyNotice = () => {
+    navigator.clipboard.writeText(noticeText);
+    showToast('Legal notice copied to clipboard!', 'success');
+  };
+
+  const handleDownloadNotice = () => {
+    const blob = new Blob([noticeText], { type: 'text/plain;charset=utf-8' });
+    const fileURL = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = fileURL;
+    link.setAttribute('download', `LegalAssist_Notice_${complaint._id}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Legal notice draft downloaded.', 'success');
+  };
 
   // FAQ accordion state
   const [faqOpen, setFaqOpen] = useState({});
@@ -154,12 +218,21 @@ const ComplaintDetail = () => {
           </div>
         </div>
         
-        <button
-          onClick={handleDownloadPdf}
-          className="w-full sm:w-auto px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-md shadow-primary-500/10 transition-all flex items-center justify-center gap-2 text-sm"
-        >
-          <Download className="w-4 h-4" /> Export Report (PDF)
-        </button>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleOpenNoticeModal}
+            className="flex-grow sm:flex-initial px-4 py-2 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 hover:bg-indigo-500/5 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 text-xs"
+            title="Generate Legal Notice Draft"
+          >
+            <FileText className="w-4 h-4 text-indigo-500" /> Draft Notice
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            className="flex-grow sm:flex-initial px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-md shadow-primary-500/10 transition-all flex items-center justify-center gap-1.5 text-xs"
+          >
+            <Download className="w-4 h-4" /> Export Report (PDF)
+          </button>
+        </div>
       </div>
 
       {/* Case Details Metadata Grid */}
@@ -243,7 +316,7 @@ const ComplaintDetail = () => {
                   1. Executive Case Summary
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-300 leading-relaxed font-medium">
-                  {ai?.summary}
+                  <DeLegaleseText text={ai?.summary} />
                 </p>
               </div>
 
@@ -273,7 +346,7 @@ const ComplaintDetail = () => {
                   {ai?.applicableLaws?.map((lawItem, idx) => (
                     <div key={idx} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 space-y-1">
                       <h4 className="font-bold text-sm text-slate-850 dark:text-white">{lawItem.law}</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed">{lawItem.description}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed"><DeLegaleseText text={lawItem.description} /></p>
                     </div>
                   ))}
                 </div>
@@ -415,7 +488,7 @@ const ComplaintDetail = () => {
                         ? 'bg-primary-600 text-white rounded-tr-none'
                         : 'bg-slate-50 dark:bg-slate-900 border border-slate-200/40 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none'
                     }`}>
-                      <p>{chat.message}</p>
+                      <p><DeLegaleseText text={chat.message} /></p>
                     </div>
 
                     {chat.role === 'user' && (
@@ -556,6 +629,53 @@ const ComplaintDetail = () => {
         </div>
 
       </div>
+
+      {/* Draft Legal Notice Modal Overlay */}
+      {showNoticeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/75 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white dark:bg-darkCard rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 md:p-8 space-y-6 relative flex flex-col h-[80vh] max-h-[600px] shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+              <h3 className="text-lg font-bold">Formal Legal Notice Draft</h3>
+              <button 
+                onClick={() => setShowNoticeModal(false)}
+                className="p-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-450 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-450">
+              * Note: You may edit this draft directly before copying or downloading.
+            </p>
+
+            <div className="flex-1 overflow-y-auto">
+              <textarea
+                value={noticeText}
+                onChange={(e) => setNoticeText(e.target.value)}
+                rows="14"
+                className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-mono text-[11px] leading-relaxed outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 resize-none text-slate-700 dark:text-slate-300 h-full"
+              ></textarea>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+              <button
+                type="button"
+                onClick={handleCopyNotice}
+                className="px-5 py-2.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+              >
+                <Copy className="w-4 h-4 text-primary-500" /> Copy to Clipboard
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadNotice}
+                className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-primary-500/10"
+              >
+                <Download className="w-4 h-4" /> Download Notice (.TXT)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-const { genAI, useMock } = require('../config/gemini');
+const { genAI } = require('../config/gemini');
 
 // Schema to ensure strict JSON output structure from Gemini
 const responseSchema = {
@@ -54,65 +54,10 @@ const responseSchema = {
   ]
 };
 
-const getMockResponse = (title, description, category) => {
-  return {
-    summary: `Based on the provided info, the user is experiencing issues regarding: "${title}". Description details: "${description.substring(0, 120)}..."`,
-    classification: category || "General Legal Matter",
-    applicableLaws: [
-      {
-        law: "Relevant Code / Section (e.g. Consumer Protection Act / IPC Section)",
-        description: "This law governs matters related to the dispute described and outlines standard liabilities and rights."
-      },
-      {
-        law: "Alternative Statutory Remedy",
-        description: "Provides specific procedures for mediation or compensation calculations."
-      }
-    ],
-    suggestedAuthority: "Appropriate Judicial / Quasi-Judicial Forum (e.g., Local Police, Consumer Commission, or civil counsel)",
-    requiredDocuments: [
-      "Copy of transaction invoices / receipts / written agreements",
-      "Written communication records (emails, letters, chat logs)",
-      "Official government-issued identity cards",
-      "Formal legal notice copy (if previously sent)"
-    ],
-    stepByStepProcedure: [
-      "Compile all relevant transaction details and communications chronologically.",
-      "Draft a written statement summarizing the grievance and date of occurrence.",
-      "Submit the complaint file to the suggested authority or consult a registered advocate.",
-      "Keep a stamped or acknowledged copy of the submitted document for legal records."
-    ],
-    nextActions: [
-      "Send a formal written notification outlining your grievance to the counterparty.",
-      "Prepare a documentation file containing all proofs.",
-      "Visit the recommended local authority office or consult a professional advocate for further representation."
-    ],
-    preventiveTips: [
-      "Ensure all financial transactions and agreements are documented in writing.",
-      "Never share confidential authentication details or sign blank papers.",
-      "Take screenshots or download backups of digital interactions immediately if disputes arise."
-    ],
-    faqs: [
-      {
-        question: "Can I file this complaint online?",
-        answer: "Many government agencies, such as the Consumer Forum (e-Daakhil) or National Cyber Crime portal, allow digital filing of preliminary grievances."
-      },
-      {
-        question: "How long does it typically take to get a resolution?",
-        answer: "Timeline varies depending on the judicial load and category, ranging from a few weeks in consumer forums to months in formal civil courts."
-      }
-    ],
-    disclaimer: "This platform provides informational guidance only and is not a substitute for professional legal advice or court decisions."
-  };
-};
-
 /**
  * Generates initial legal guidance analysis for a citizen's complaint
  */
 const generateLegalGuidance = async (title, description, category, state, district) => {
-  if (useMock) {
-    return getMockResponse(title, description, category);
-  }
-
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
@@ -151,9 +96,8 @@ const generateLegalGuidance = async (title, description, category, state, distri
     const textResponse = result.response.text();
     return JSON.parse(textResponse);
   } catch (error) {
-    console.error("Error communicating with Gemini API:", error);
-    // Fallback to mock response to ensure system resilience
-    return getMockResponse(title, description, category);
+    console.error("Gemini API Error during guidance generation:", error);
+    throw new Error("Unable to generate AI legal report. Please check your API key or network configurations.");
   }
 };
 
@@ -163,10 +107,6 @@ const generateLegalGuidance = async (title, description, category, state, distri
 const getChatReply = async (history, newMessage, complaintDetails) => {
   const disclaimerText = "\n\n**Disclaimer: This platform provides informational guidance only and is not a substitute for professional legal advice or court decisions.**";
   
-  if (useMock) {
-    return "I understand your follow-up concern regarding this case. Please note that you may need to file an affidavit or request mediation. I suggest speaking to local legal aid services for direct advice." + disclaimerText;
-  }
-
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
@@ -200,8 +140,8 @@ const getChatReply = async (history, newMessage, complaintDetails) => {
     }
     return replyText;
   } catch (error) {
-    console.error("Error in Gemini Chat follow-up:", error);
-    return "I apologize, but I am having trouble connecting to my knowledge base right now. Please consult a legal professional for guidance." + disclaimerText;
+    console.error("Gemini API Error during follow-up chat:", error);
+    return "I apologize, but I am currently unable to reach my legal databases. Please consult a licensed professional." + disclaimerText;
   }
 };
 

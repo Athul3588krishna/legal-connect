@@ -7,6 +7,7 @@ import {
   ArrowLeft, FileText, Send, Calendar, MapPin, 
   User, CheckCircle, Scale, ShieldAlert, BookOpen 
 } from 'lucide-react';
+import DeLegaleseText from '../../components/DeLegaleseText';
 
 const AdvocateComplaintDetail = () => {
   const { id } = useParams();
@@ -168,7 +169,7 @@ const AdvocateComplaintDetail = () => {
               <div className="space-y-4 text-xs">
                 <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl space-y-1">
                   <span className="font-bold text-slate-450 uppercase block text-[10px]">AI Case Summary:</span>
-                  <p className="text-slate-500 dark:text-slate-300 leading-relaxed">{ai.summary}</p>
+                  <p className="text-slate-500 dark:text-slate-300 leading-relaxed"><DeLegaleseText text={ai.summary} /></p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -188,7 +189,7 @@ const AdvocateComplaintDetail = () => {
                     {ai.applicableLaws?.map((law, idx) => (
                       <div key={idx} className="pt-2 first:pt-0">
                         <p className="font-bold">{law.law}</p>
-                        <p className="text-slate-400 leading-relaxed mt-0.5">{law.description}</p>
+                        <p className="text-slate-400 leading-relaxed mt-0.5"><DeLegaleseText text={law.description} /></p>
                       </div>
                     ))}
                   </div>

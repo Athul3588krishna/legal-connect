@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { ToastContext } from '../../context/ToastContext';
-import { ShieldCheck, ArrowLeft, Upload, FileText, Trash2, Cpu } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, Upload, FileText, Trash2, Cpu, Mic } from 'lucide-react';
 
 const SubmitComplaint = () => {
   const { showToast } = useContext(ToastContext);
@@ -16,6 +16,43 @@ const SubmitComplaint = () => {
   const [category, setCategory] = useState('General');
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const handleVoiceInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('Speech recognition is not supported in this browser. Please use Chrome, Edge or Safari.', 'warning');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      showToast('Speech recognition active. Speak now...', 'info');
+    };
+
+    recognition.onerror = (e) => {
+      console.error(e);
+      setIsListening(false);
+      showToast('Error recording voice input.', 'error');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setDescription((prev) => prev ? prev + ' ' + transcript : transcript);
+      showToast('Speech added to description!', 'success');
+    };
+
+    recognition.start();
+  };
 
   // States for visual feedback during AI loading
   const [loadingStep, setLoadingStep] = useState(0);
@@ -246,14 +283,28 @@ const SubmitComplaint = () => {
             {/* Description */}
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Incident Description *</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-                rows="6"
-                placeholder="Detail the timeline, transaction details, specific claims, dates, and names of individuals/businesses involved..."
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none resize-none"
-              ></textarea>
+              <div className="relative">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  required
+                  rows="6"
+                  placeholder="Detail the timeline, transaction details, specific claims, dates, and names of individuals/businesses involved..."
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none resize-none animate-fade-in"
+                ></textarea>
+                <button
+                  type="button"
+                  onClick={handleVoiceInput}
+                  className={`absolute right-3 bottom-4 p-2.5 rounded-xl border transition-all ${
+                    isListening
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse border-rose-650'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-primary-500 bg-white/50 dark:bg-darkCard/50 text-slate-405 hover:text-primary-500'
+                  }`}
+                  title="Voice dictation (Speech to Text)"
+                >
+                  <Mic className="w-4.5 h-4.5" />
+                </button>
+              </div>
             </div>
 
             {/* Document Upload Area */}

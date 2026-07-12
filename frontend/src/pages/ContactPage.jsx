@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { ToastContext } from '../context/ToastContext';
 import { Mail, Phone, MapPin, Send, HelpCircle } from 'lucide-react';
+import api from '../services/api';
 
 const ContactPage = () => {
   const { showToast } = useContext(ToastContext);
@@ -11,19 +12,24 @@ const ContactPage = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
     setLoading(true);
-    // Mock submit
-    setTimeout(() => {
-      showToast('Thank you! Your message has been sent to the LegalAssist support team.', 'success');
-      setFormData({ name: '', email: '', subject: '', message: '' });
+    try {
+      const res = await api.post('/support', formData);
+      if (res.data.success) {
+        showToast(res.data.message, 'success');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to submit query.', 'error');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (

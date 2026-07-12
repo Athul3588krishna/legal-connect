@@ -35,6 +35,7 @@ app.use('/api/advocate', require('./routes/advocateRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/feedback', require('./routes/feedbackRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/support', require('./routes/supportRoutes'));
 
 // Root Endpoint for verification
 app.get('/', (req, res) => {

@@ -32,6 +32,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserManager from './pages/Admin/UserManager';
 import ComplaintManager from './pages/Admin/ComplaintManager';
 import FeedbackManager from './pages/Admin/FeedbackManager';
+import SupportManager from './pages/Admin/SupportManager';
 
 // Context Providers
 import { AuthProvider } from './context/AuthContext';
@@ -136,6 +137,14 @@ function App() {
                     element={
                       <ProtectedRoute allowedRoles={['admin']}>
                         <FeedbackManager />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/support" 
+                    element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <SupportManager />
                       </ProtectedRoute>
                     } 
                   />
