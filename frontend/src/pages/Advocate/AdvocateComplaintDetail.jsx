@@ -5,13 +5,14 @@ import { ToastContext } from '../../context/ToastContext';
 import { AuthContext } from '../../context/AuthContext';
 import { 
   ArrowLeft, FileText, Send, Calendar, MapPin, 
-  User, CheckCircle, Scale, ShieldAlert, BookOpen 
+  User, CheckCircle, Scale, ShieldAlert, BookOpen, Clock, XCircle, CheckCircle2
 } from 'lucide-react';
 import DeLegaleseText from '../../components/DeLegaleseText';
 
 const AdvocateComplaintDetail = () => {
   const { id } = useParams();
   const { showToast } = useContext(ToastContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [complaint, setComplaint] = useState(null);
@@ -20,6 +21,8 @@ const AdvocateComplaintDetail = () => {
   // Submit Response state
   const [replyMessage, setReplyMessage] = useState('');
   const [caseStatus, setCaseStatus] = useState('under_review');
+  const [includeVideoCall, setIncludeVideoCall] = useState(false);
+  const [consultationFee, setConsultationFee] = useState(500);
   const [submittingReply, setSubmittingReply] = useState(false);
 
   const fetchComplaintDetails = async () => {
@@ -51,11 +54,15 @@ const AdvocateComplaintDetail = () => {
     try {
       const res = await api.post(`/advocate/complaints/${id}/reply`, {
         message: replyMessage,
-        status: caseStatus
+        status: caseStatus,
+        includeVideoCall,
+        consultationFee
       });
       if (res.data.success) {
         showToast('Guidance reply logged and citizen notified!', 'success');
         setReplyMessage('');
+        setIncludeVideoCall(false);
+        setConsultationFee(500);
         fetchComplaintDetails();
       }
     } catch (err) {
@@ -91,6 +98,9 @@ const AdvocateComplaintDetail = () => {
   }
 
   const ai = complaint.aiResponse;
+  const advocateSlots = complaint.videoSlots?.filter(
+    s => s.advocate === user?._id || s.advocate?._id === user?._id
+  ) || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fade-in">
@@ -198,6 +208,119 @@ const AdvocateComplaintDetail = () => {
             </div>
           )}
 
+          {/* Video Consultation Slots Section */}
+          {ai && (
+            <div className="p-6 border border-slate-200 dark:border-slate-800 bg-white dark:bg-darkCard rounded-3xl space-y-6">
+              <h3 className="text-sm font-bold text-slate-850 dark:text-white border-l-4 border-indigo-500 pl-3">
+                Live Video Consultation Requests
+              </h3>
+
+              {advocateSlots.length === 0 ? (
+                <p className="text-xs text-slate-400 font-semibold leading-relaxed">No active video call requests from this citizen.</p>
+              ) : (
+                <div className="space-y-4">
+                  {advocateSlots.map((slot) => {
+                    const isPending = slot.status === 'pending';
+                    return (
+                      <div key={slot._id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-855 bg-slate-50/50 dark:bg-slate-950/10 space-y-4 text-xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-bold text-[10px] text-slate-400 uppercase block mb-1">Requested Time:</span>
+                            <p className="font-bold text-slate-700 dark:text-slate-250">{new Date(slot.requestedTime).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className={`inline-block border px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                              slot.status === 'scheduled' 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-350 border-emerald-500/20 animate-pulse' 
+                                : slot.status === 'rejected'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-350 border-rose-500/20'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-350 border-amber-500/20'
+                            }`}>
+                              {slot.status === 'scheduled' ? 'Scheduled' : slot.status === 'rejected' ? 'Declined' : 'Pending Approval'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {slot.status === 'scheduled' && (
+                          <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-250/20 font-semibold">
+                            <span className="font-bold text-[9px] uppercase text-emerald-600 block mb-0.5">Confirmed Meeting Time:</span>
+                            <p className="text-slate-700 dark:text-slate-200">{new Date(slot.scheduledTime).toLocaleString()}</p>
+                            <a 
+                              href={slot.meetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-450 hover:underline font-bold mt-2"
+                            >
+                              ★ Enter Conference Room Link
+                            </a>
+                          </div>
+                        )}
+
+                        {isPending && (
+                          <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const targetTime = e.target.schedTime.value || slot.requestedTime;
+                            try {
+                              const res = await api.put(`/complaints/${complaint._id}/slots/${slot._id}/schedule`, {
+                                scheduledTime: targetTime,
+                                status: 'scheduled'
+                              });
+                              if (res.data.success) {
+                                showToast('Video call scheduled successfully!', 'success');
+                                fetchComplaintDetails();
+                              }
+                            } catch (err) {
+                              showToast('Failed to schedule video slot.', 'error');
+                            }
+                          }} className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                            <div className="space-y-1">
+                              <label className="font-bold text-[10px] text-slate-500 uppercase block">Confirm/Reschedule Meeting Time *</label>
+                              <input 
+                                type="datetime-local" 
+                                name="schedTime"
+                                defaultValue={new Date(slot.requestedTime).toISOString().slice(0, 16)}
+                                required
+                                className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="submit"
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-all text-[10px] shadow-sm shadow-emerald-500/10"
+                              >
+                                Approve Call
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!window.confirm('Decline this video consultation request?')) return;
+                                  try {
+                                    const res = await api.put(`/complaints/${complaint._id}/slots/${slot._id}/schedule`, {
+                                      status: 'rejected'
+                                    });
+                                    if (res.data.success) {
+                                      showToast('Video call request declined.', 'success');
+                                      fetchComplaintDetails();
+                                    }
+                                  } catch (err) {
+                                    showToast('Failed to decline slot request.', 'error');
+                                  }
+                                }}
+                                className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-rose-500/5 text-rose-500 rounded-lg font-bold transition-all text-[10px]"
+                              >
+                                Decline Request
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Submit Advocate response Advice form */}
           <div className="p-6 border border-slate-200 dark:border-slate-800 bg-white dark:bg-darkCard rounded-3xl space-y-6">
             <h3 className="text-sm font-bold text-slate-850 dark:text-white border-l-4 border-emerald-500 pl-3">
@@ -217,6 +340,17 @@ const AdvocateComplaintDetail = () => {
                     <option value="resolved">Resolved / Consultation Finished</option>
                   </select>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Consultation Fee (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={consultationFee}
+                    onChange={(e) => setConsultationFee(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-xs outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -229,6 +363,19 @@ const AdvocateComplaintDetail = () => {
                   placeholder="Provide details on procedural recommendations, notify about template documents, draft notices, or offer next step consulting offline..."
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-xs focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 outline-none resize-none"
                 ></textarea>
+              </div>
+
+              <div className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-150 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 max-w-sm">
+                <input
+                  type="checkbox"
+                  id="includeVideoCall"
+                  checked={includeVideoCall}
+                  onChange={(e) => setIncludeVideoCall(e.target.checked)}
+                  className="w-4 h-4 rounded accent-primary-600 cursor-pointer"
+                />
+                <label htmlFor="includeVideoCall" className="text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer select-none">
+                  Schedule Live WebRTC Video Call Room
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">

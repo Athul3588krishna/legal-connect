@@ -9,13 +9,26 @@ const documentSchema = new mongoose.Schema({
 const advocateReplySchema = new mongoose.Schema({
   advocate: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   message: { type: String, required: true },
-  replyDate: { type: Date, default: Date.now }
+  replyDate: { type: Date, default: Date.now },
+  videoMeetingUrl: { type: String, default: '' },
+  consultationFee: { type: Number, default: 500 },
+  paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
+  transactionId: { type: String, default: '' }
 });
 
 const chatMessageSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'model'], required: true },
   message: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
+});
+
+const videoSlotSchema = new mongoose.Schema({
+  advocate: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  requestedTime: { type: Date, required: true },
+  scheduledTime: { type: Date },
+  status: { type: String, enum: ['pending', 'scheduled', 'rejected'], default: 'pending' },
+  meetingUrl: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now }
 });
 
 const aiLawSchema = new mongoose.Schema({
@@ -80,6 +93,7 @@ const complaintSchema = new mongoose.Schema({
   },
   aiResponse: aiResponseSchema,
   advocateReplies: [advocateReplySchema],
+  videoSlots: [videoSlotSchema],
   followUpChat: [chatMessageSchema]
 }, {
   timestamps: true

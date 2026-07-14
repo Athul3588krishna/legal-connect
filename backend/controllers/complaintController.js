@@ -294,10 +294,199 @@ const downloadPdfReport = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Request a video consultation slot from an advocate
+ * @route   POST /api/complaints/:id/slots/request
+ * @access  Private (Citizen)
+ */
+const requestVideoSlot = async (req, res, next) => {
+  const { advocateId, requestedTime } = req.body;
+
+  try {
+    if (!advocateId || !requestedTime) {
+      return res.status(400).json({ success: false, message: 'Please provide advocate ID and preferred date/time.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Case dossier not found.' });
+    }
+
+    if (complaint.citizen.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to request slots for this case.' });
+    }
+
+    const advocate = await User.findOne({ _id: advocateId, role: 'advocate' });
+    if (!advocate) {
+      return res.status(404).json({ success: false, message: 'Advocate not found.' });
+    }
+
+    // Check if slot request already exists for this advocate and is pending/scheduled
+    const existing = complaint.videoSlots.find(
+      s => s.advocate.toString() === advocateId && ['pending', 'scheduled'].includes(s.status)
+    );
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'You already have a pending or active slot request with this advocate.' });
+    }
+
+    // Add slot request
+    complaint.videoSlots.push({
+      advocate: advocateId,
+      requestedTime: new Date(requestedTime),
+      status: 'pending'
+    });
+
+    await complaint.save();
+
+    // Notify the advocate
+    await Notification.create({
+      user: advocateId,
+      message: `Citizen ${req.user.username} has requested a video consultation slot for case: "${complaint.title}".`,
+      type: 'complaint'
+    });
+
+    res.status(201).json({ success: true, message: 'Consultation slot request submitted to advocate.', slots: complaint.videoSlots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Schedule/Approve a requested video slot
+ * @route   PUT /api/complaints/:id/slots/:slotId/schedule
+ * @access  Private (Advocate)
+ */
+const scheduleVideoSlot = async (req, res, next) => {
+  const { scheduledTime, status } = req.body; // status: 'scheduled' or 'rejected'
+
+  try {
+    if (!status || !['scheduled', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Please provide valid status: scheduled or rejected.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Case dossier not found.' });
+    }
+
+    const slot = complaint.videoSlots.id(req.params.slotId);
+    if (!slot) {
+      return res.status(404).json({ success: false, message: 'Video slot request not found.' });
+    }
+
+    if (slot.advocate.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to manage this slot request.' });
+    }
+
+    slot.status = status;
+
+    if (status === 'scheduled') {
+      if (!scheduledTime) {
+        return res.status(400).json({ success: false, message: 'Please provide a confirmed date/time.' });
+      }
+      slot.scheduledTime = new Date(scheduledTime);
+      
+      const cleanTitle = complaint.title.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20);
+      slot.meetingUrl = `https://meet.jit.si/LegalAssist-Consultation-${cleanTitle}-${complaint._id}-${slot._id}`;
+    }
+
+    await complaint.save();
+
+    // Notify the citizen
+    const formattedDate = status === 'scheduled' ? new Date(scheduledTime).toLocaleString() : '';
+    const alertMessage = status === 'scheduled' 
+      ? `Advocate ${req.user.username} has confirmed your video consultation for ${formattedDate}.`
+      : `Advocate ${req.user.username} has declined your video consultation request.`;
+
+    await Notification.create({
+      user: complaint.citizen,
+      message: alertMessage,
+      type: 'reply'
+    });
+
+    res.status(200).json({ success: true, message: `Video call request ${status}.`, slots: complaint.videoSlots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Cancel/Delete a video slot request
+ * @route   DELETE /api/complaints/:id/slots/:slotId
+ * @access  Private (Citizen)
+ */
+const deleteVideoSlot = async (req, res, next) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Case dossier not found.' });
+    }
+
+    if (complaint.citizen.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to modify slots for this case.' });
+    }
+
+    // Pull/remove the slot
+    complaint.videoSlots.pull({ _id: req.params.slotId });
+    await complaint.save();
+
+    res.status(200).json({ success: true, message: 'Video slot request cleared.', slots: complaint.videoSlots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Simulate paying consultation fee for advocate reply
+ * @route   POST /api/complaints/:id/replies/:replyId/pay
+ * @access  Private (Citizen)
+ */
+const payConsultationFee = async (req, res, next) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Case dossier not found.' });
+    }
+
+    if (complaint.citizen.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to pay fees for this case.' });
+    }
+
+    const reply = complaint.advocateReplies.id(req.params.replyId);
+    if (!reply) {
+      return res.status(404).json({ success: false, message: 'Advocate reply not found.' });
+    }
+
+    if (reply.paymentStatus === 'paid') {
+      return res.status(400).json({ success: false, message: 'Fee for this consultation has already been paid.' });
+    }
+
+    // Update payment details
+    reply.paymentStatus = 'paid';
+    reply.transactionId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+    await complaint.save();
+
+    // Create Notification
+    await Notification.create({
+      user: complaint.citizen,
+      message: `Payment of ₹${reply.consultationFee} successfully processed for Advocate consultation. Receipt ID: ${reply.transactionId}`,
+      type: 'reply'
+    });
+
+    res.status(200).json({ success: true, message: 'Payment successfully simulated!', complaint });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   submitComplaint,
   getComplaints,
   getComplaintById,
   askFollowUp,
-  downloadPdfReport
+  downloadPdfReport,
+  requestVideoSlot,
+  scheduleVideoSlot,
+  deleteVideoSlot,
+  payConsultationFee
 };

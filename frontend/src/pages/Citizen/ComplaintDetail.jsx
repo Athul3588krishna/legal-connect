@@ -5,7 +5,7 @@ import { ToastContext } from '../../context/ToastContext';
 import { AuthContext } from '../../context/AuthContext';
 import { 
   ArrowLeft, Download, Send, MessageSquare, ShieldAlert, FileText, 
-  HelpCircle, ChevronDown, ChevronUp, CheckSquare, Square, CheckCircle, Clock, Copy, X
+  HelpCircle, ChevronDown, ChevronUp, CheckSquare, Square, CheckCircle, Clock, Copy, X, Video
 } from 'lucide-react';
 import DeLegaleseText from '../../components/DeLegaleseText';
 
@@ -25,6 +25,12 @@ const ComplaintDetail = () => {
   const [advocateRating, setAdvocateRating] = useState(5);
   const [reviewTextContent, setReviewTextContent] = useState('');
   const [advocateReviewsMap, setAdvocateReviewsMap] = useState({});
+
+  // Payment gateway simulation states
+  const [activePaymentReply, setActivePaymentReply] = useState(null); // { replyId, fee }
+  const [paymentStep, setPaymentStep] = useState(0); // 0: Form, 1: Connecting, 2: OTP, 3: Processing, 4: Success
+  const [otpCode, setOtpCode] = useState('');
+  const [cardFormData, setCardFormData] = useState({ name: '', number: '', expiry: '', cvv: '' });
 
   // Chat States
   const [chatMessage, setChatMessage] = useState('');
@@ -612,23 +618,139 @@ ${complaint.citizen?.username || 'Grievant'}
                                 {new Date(reply.replyDate).toLocaleString()}
                               </span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedAdvocate(reply.advocate);
-                                setAdvocateRating(5);
-                                setReviewTextContent('');
-                                setShowReviewModal(true);
-                              }}
-                              className="text-[10px] text-primary-500 hover:underline font-bold px-3 py-1.5 rounded-lg border border-primary-500/10 hover:bg-primary-500/5 transition-all"
-                            >
-                              Rate Advocate
-                            </button>
+                            <div className="flex gap-2">
+                              {reply.paymentStatus === 'paid' ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold px-3 py-1.5 rounded-lg border border-emerald-500/10 bg-emerald-500/5 select-none" title={`Receipt ID: ${reply.transactionId}`}>
+                                  ✓ Paid (₹{reply.consultationFee || 500})
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActivePaymentReply({ replyId: reply._id, fee: reply.consultationFee || 500 });
+                                    setPaymentStep(0);
+                                    setCardFormData({ name: '', number: '', expiry: '', cvv: '' });
+                                    setOtpCode('');
+                                  }}
+                                  className="text-[10px] text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg font-bold transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1 cursor-pointer animate-pulse"
+                                >
+                                  💳 Pay Fee (₹{reply.consultationFee || 500})
+                                </button>
+                              )}
+                              
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAdvocate(reply.advocate);
+                                  setAdvocateRating(5);
+                                  setReviewTextContent('');
+                                  setShowReviewModal(true);
+                                }}
+                                className="text-[10px] text-primary-500 hover:underline font-bold px-3 py-1.5 rounded-lg border border-primary-500/10 hover:bg-primary-500/5 transition-all"
+                              >
+                                Rate Advocate
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                        <p className="text-xs text-slate-500 dark:text-slate-350 leading-relaxed p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-slate-100 dark:border-slate-800/80">
                           {reply.message}
                         </p>
+
+                        {/* Slot booking interface */}
+                        {(() => {
+                          const slot = complaint.videoSlots?.find(
+                            s => s.advocate === reply.advocate?._id || s.advocate?._id === reply.advocate?._id
+                          );
+                          return (
+                            <div className="mt-3 p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-xs">
+                              {!slot ? (
+                                <form onSubmit={async (e) => {
+                                  e.preventDefault();
+                                  const requestedTime = e.target.prefTime.value;
+                                  if (!requestedTime) return;
+                                  try {
+                                    const res = await api.post(`/complaints/${complaint._id}/slots/request`, {
+                                      advocateId: reply.advocate?._id,
+                                      requestedTime
+                                    });
+                                    if (res.data.success) {
+                                      showToast('Video consultation requested!', 'success');
+                                      fetchComplaintDetails();
+                                    }
+                                  } catch (err) {
+                                    showToast(err.response?.data?.message || 'Failed to request video slot.', 'error');
+                                  }
+                                }} className="flex flex-col sm:flex-row sm:items-end gap-3">
+                                  <div className="flex-1 space-y-1">
+                                    <label className="font-bold text-[9px] text-slate-450 uppercase block mb-1">Request Live Video Consultation</label>
+                                    <input
+                                      type="datetime-local"
+                                      name="prefTime"
+                                      required
+                                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500"
+                                    />
+                                  </div>
+                                  <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow-sm shadow-indigo-500/10 transition-all cursor-pointer"
+                                  >
+                                    Book Video Slot
+                                  </button>
+                                </form>
+                              ) : (
+                                <div className="flex justify-between items-center gap-4 flex-wrap">
+                                  <div className="space-y-1">
+                                    <span className="font-bold text-[9px] text-slate-450 uppercase block">Consultation Status</span>
+                                    {slot.status === 'pending' && (
+                                      <p className="text-slate-500 font-medium">Awaiting slot confirmation for preferred time: <span className="font-bold text-slate-750 dark:text-slate-250">{new Date(slot.requestedTime).toLocaleString()}</span></p>
+                                    )}
+                                    {slot.status === 'scheduled' && (
+                                      <p className="text-slate-800 dark:text-slate-250 font-bold">
+                                        Confirmed! Video call scheduled for: <span className="text-indigo-600 dark:text-indigo-400">{new Date(slot.scheduledTime).toLocaleString()}</span>
+                                      </p>
+                                    )}
+                                    {slot.status === 'rejected' && (
+                                      <p className="text-rose-500 font-medium">Declined by advocate. You can clear request and try booking another slot.</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {slot.status === 'scheduled' && (
+                                      <a
+                                        href={slot.meetingUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow-sm shadow-indigo-500/10 transition-all animate-pulse flex items-center gap-1"
+                                      >
+                                        <Video className="w-3.5 h-3.5" /> Join Live Call
+                                      </a>
+                                    )}
+                                    {(slot.status === 'pending' || slot.status === 'rejected') && (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (!window.confirm('Cancel this video call request?')) return;
+                                          try {
+                                            const res = await api.delete(`/complaints/${complaint._id}/slots/${slot._id}`);
+                                            if (res.data.success) {
+                                              showToast('Video slot request cleared.', 'success');
+                                              fetchComplaintDetails();
+                                            }
+                                          } catch (err) {
+                                            showToast('Failed to cancel slot request.', 'error');
+                                          }
+                                        }}
+                                        className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition-colors"
+                                      >
+                                        Cancel Request
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -795,6 +917,217 @@ ${complaint.citizen?.username || 'Grievant'}
                 Submit Review
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Simulated Payment Gateway Modal */}
+      {activePaymentReply && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/75 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white dark:bg-darkCard rounded-3xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 md:p-8 space-y-6 shadow-2xl relative text-slate-800 dark:text-slate-200">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
+                <h3 className="text-sm font-bold text-slate-850 dark:text-white">LegalAssist Payment Gateway</h3>
+              </div>
+              {paymentStep !== 1 && paymentStep !== 3 && (
+                <button 
+                  onClick={() => setActivePaymentReply(null)}
+                  className="p-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-450 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Step 0: Card Details Form */}
+            {paymentStep === 0 && (
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                setPaymentStep(1);
+                // Simulate gateway connection loading
+                setTimeout(() => {
+                  setPaymentStep(2);
+                }, 2000);
+              }} className="space-y-4 text-xs">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">Consultation Fee Amount</span>
+                    <p className="text-lg font-black text-slate-800 dark:text-white">₹{activePaymentReply.fee}.00</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 font-bold text-[9px] uppercase border border-indigo-500/20 rounded-full">
+                    Secure Payment
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-450 uppercase block text-left">Cardholder Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={cardFormData.name}
+                    onChange={(e) => setCardFormData({ ...cardFormData, name: e.target.value })}
+                    placeholder="E.g. Athul Krishna"
+                    className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 text-slate-700 dark:text-slate-300"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-450 uppercase block text-left">Card Number</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength="19"
+                    placeholder="XXXX XXXX XXXX XXXX"
+                    value={cardFormData.number}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\s?/g, '').replace(/[^0-9]/g, '');
+                      const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+                      setCardFormData({ ...cardFormData, number: formatted });
+                    }}
+                    className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 text-slate-700 dark:text-slate-300"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-450 uppercase block text-left">Expiry Date</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength="5"
+                      placeholder="MM/YY"
+                      value={cardFormData.expiry}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, '');
+                        if (val.length > 2) {
+                          val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                        }
+                        setCardFormData({ ...cardFormData, expiry: val });
+                      }}
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 text-slate-700 dark:text-slate-300"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-450 uppercase block text-left">CVV Code</label>
+                    <input
+                      type="password"
+                      required
+                      maxLength="3"
+                      placeholder="•••"
+                      value={cardFormData.cvv}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setCardFormData({ ...cardFormData, cvv: val });
+                      }}
+                      className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 text-slate-700 dark:text-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer mt-4"
+                >
+                  Pay ₹{activePaymentReply.fee}.00
+                </button>
+              </form>
+            )}
+
+            {/* Step 1: Connecting Loading */}
+            {paymentStep === 1 && (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
+                <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-850 dark:text-white">Connecting to secure gateway...</p>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-400">Do not refresh or click back</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: OTP Entry */}
+            {paymentStep === 2 && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (otpCode !== '1234') {
+                  showToast('Invalid OTP code. Please use simulated code "1234".', 'error');
+                  return;
+                }
+                setPaymentStep(3);
+                try {
+                  const res = await api.post(`/complaints/${complaint._id}/replies/${activePaymentReply.replyId}/pay`);
+                  if (res.data.success) {
+                    setPaymentStep(4);
+                  }
+                } catch (err) {
+                  showToast('Payment processing failed.', 'error');
+                  setPaymentStep(0);
+                }
+              }} className="space-y-4 text-xs text-center py-4">
+                <div className="mx-auto w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <div className="space-y-1 max-w-sm mx-auto">
+                  <p className="font-bold text-slate-850 dark:text-white text-xs">Verify Transaction OTP</p>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-400 leading-relaxed">
+                    A mock 4-digit code has been sent to your bank phone. Enter **1234** to simulate verification.
+                  </p>
+                </div>
+                <div className="max-w-xs mx-auto space-y-3 pt-2">
+                  <input
+                    type="text"
+                    maxLength="4"
+                    required
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter 4-digit OTP"
+                    className="w-full text-center tracking-widest px-4 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500 text-slate-700 dark:text-slate-350"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  >
+                    Confirm Payment Authorization
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Step 3: Processing API call */}
+            {paymentStep === 3 && (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
+                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-850 dark:text-white">Authorizing transaction with bank...</p>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-400">Verifying security signatures</p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Success */}
+            {paymentStep === 4 && (
+              <div className="flex flex-col items-center justify-center py-8 space-y-5 text-center">
+                <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center border border-emerald-500/20 animate-bounce">
+                  <CheckCircle className="w-10 h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="text-sm font-bold text-slate-850 dark:text-white">Payment Completed Successfully!</h4>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-400">Your advocate consultation is now unlocked.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePaymentReply(null);
+                    fetchComplaintDetails();
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

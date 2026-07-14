@@ -38,13 +38,23 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/support', require('./routes/supportRoutes'));
 app.use('/api/advocates', require('./routes/advocateReviewRoutes'));
 
-// Root Endpoint for verification
-app.get('/', (req, res) => {
-  res.status(200).json({ 
-    success: true, 
-    message: 'LegalAssist API is running smoothly.' 
+// Serve static assets in production
+if (process.env.NODE_ENV === 'production') {
+  // Set static folder
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../frontend', 'dist', 'index.html'));
   });
-});
+} else {
+  // Root Endpoint for verification in development
+  app.get('/', (req, res) => {
+    res.status(200).json({ 
+      success: true, 
+      message: 'LegalAssist API is running smoothly.' 
+    });
+  });
+}
 
 // Global Error Handler Middleware
 app.use(errorHandler);

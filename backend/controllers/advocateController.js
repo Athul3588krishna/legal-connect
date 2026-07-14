@@ -55,7 +55,7 @@ const getAdvocateComplaints = async (req, res, next) => {
  * @access  Private (Advocate)
  */
 const replyToComplaint = async (req, res, next) => {
-  const { message, status } = req.body;
+  const { message, status, includeVideoCall, consultationFee } = req.body;
 
   try {
     if (!message) {
@@ -67,11 +67,19 @@ const replyToComplaint = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Complaint not found' });
     }
 
+    let videoMeetingUrl = '';
+    if (includeVideoCall) {
+      const cleanTitle = complaint.title.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20);
+      videoMeetingUrl = `https://meet.jit.si/LegalAssist-Consultation-${cleanTitle}-${complaint._id}`;
+    }
+
     // Add reply
     complaint.advocateReplies.push({
       advocate: req.user.id,
       message,
-      replyDate: new Date()
+      replyDate: new Date(),
+      videoMeetingUrl,
+      consultationFee: consultationFee ? Number(consultationFee) : 500
     });
 
     // Update status if provided, else transition to 'under_review'
