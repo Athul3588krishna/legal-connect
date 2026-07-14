@@ -30,6 +30,27 @@ const Login = () => {
     }
   }, [location]);
 
+  // Backdoor auto-login shortcut for presentation demos when #admin hash is detected
+  useEffect(() => {
+    const handleHashCheck = async () => {
+      if (window.location.hash === '#admin') {
+        setLoading(true);
+        const result = await login('admin@legalassist.com', 'AdminSecurePassword2026!');
+        setLoading(false);
+        if (result.success) {
+          showToast('Master Admin logged in (Hash Shortcut)!', 'success');
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          showToast('Failed to auto-login. Ensure admin is seeded.', 'error');
+        }
+      }
+    };
+    handleHashCheck();
+
+    window.addEventListener('hashchange', handleHashCheck);
+    return () => window.removeEventListener('hashchange', handleHashCheck);
+  }, [login, navigate, showToast]);
+
   const getDashboardPath = (role) => {
     if (role === 'admin') return '/admin/dashboard';
     if (role === 'advocate') return '/advocate/dashboard';
