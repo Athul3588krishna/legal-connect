@@ -31,6 +31,7 @@ ${html}
   
   fs.writeFileSync(logFile, content, 'utf8');
   console.log(`[MOCK EMAIL] Email to <${to}> logged successfully at: ${logFile}`);
+  console.log(content);
 };
 
 /**

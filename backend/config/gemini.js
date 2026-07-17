@@ -1,11 +1,13 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error('FATAL: GEMINI_API_KEY is not defined in environment variables. Gemini AI integration requires an active API key.');
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.warn('WARNING: GEMINI_API_KEY is not defined in environment variables. AI-powered guidance will use mock fallback responses.');
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 module.exports = {
   genAI
 };
+

@@ -54,10 +54,65 @@ const responseSchema = {
   ]
 };
 
+const getFallbackGuidance = (title, description, category, state, district) => {
+  return {
+    summary: `Informational overview: A grievance has been reported regarding "${title}" under the category "${category || 'General'}" in ${district}, ${state}. Description: "${description.substring(0, 100)}..."`,
+    classification: category || "General Dispute",
+    applicableLaws: [
+      {
+        law: "Relevant Local and Central Regulations",
+        description: "Depending on the exact nature of the dispute, standard civil, consumer, or penal codes may apply. For example, the Consumer Protection Act, 2019 or relevant provisions of the Indian Penal Code/Bharatiya Nyaya Sanhita."
+      },
+      {
+        law: "Code of Civil Procedure / Code of Criminal Procedure",
+        description: "Governs the procedural aspects of filing petitions, complaints, or suits before the appropriate judicial authority."
+      }
+    ],
+    suggestedAuthority: "Local District Court, Consumer Forum, or Police Station depending on nature of the dispute.",
+    requiredDocuments: [
+      "Copy of the written complaint or grievance document.",
+      "Any supporting evidence (receipts, chat histories, emails, photos).",
+      "Government-issued identity proof (Aadhaar Card, PAN, or Passport).",
+      "Representational agreements or notices sent to the opposing party, if any."
+    ],
+    stepByStepProcedure: [
+      "Gather and organize all relevant documents and evidence related to the grievance.",
+      "Draft a formal complaint outlining the facts, dates, and specific relief sought.",
+      "Submit the complaint to the relevant authority or register it online via the appropriate portal.",
+      "Keep track of the acknowledgement number or diary number for future reference.",
+      "Consult a legal professional or legal aid clinic to determine the next formal steps."
+    ],
+    nextActions: [
+      "Review all supporting files and compile a timeline of events.",
+      "Consult a local lawyer or free legal aid service for professional counsel."
+    ],
+    preventiveTips: [
+      "Always keep written records of communications and transactions.",
+      "Read all terms, conditions, and contracts thoroughly before signing.",
+      "Verify the credentials of any third-party services or vendors."
+    ],
+    faqs: [
+      {
+        question: "Is this automated analysis legally binding?",
+        answer: "No. This guidance is purely informational. Only official court orders or signed settlement agreements are legally binding."
+      },
+      {
+        question: "What is my next immediate step?",
+        answer: "You should seek a legal consultation with an advocate or approach the local legal services authority for official representation."
+      }
+    ],
+    disclaimer: "This platform provides informational guidance only and is not a substitute for professional legal advice or court decisions."
+  };
+};
+
 /**
  * Generates initial legal guidance analysis for a citizen's complaint
  */
 const generateLegalGuidance = async (title, description, category, state, district) => {
+  if (!genAI) {
+    console.log("Using offline mock fallback legal guidance.");
+    return getFallbackGuidance(title, description, category, state, district);
+  }
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
@@ -97,7 +152,8 @@ const generateLegalGuidance = async (title, description, category, state, distri
     return JSON.parse(textResponse);
   } catch (error) {
     console.error("Gemini API Error during guidance generation:", error);
-    throw new Error("Unable to generate AI legal report. Please check your API key or network configurations.");
+    console.warn("Falling back to structured offline legal guidance.");
+    return getFallbackGuidance(title, description, category, state, district);
   }
 };
 
@@ -107,6 +163,10 @@ const generateLegalGuidance = async (title, description, category, state, distri
 const getChatReply = async (history, newMessage, complaintDetails) => {
   const disclaimerText = "\n\n**Disclaimer: This platform provides informational guidance only and is not a substitute for professional legal advice or court decisions.**";
   
+  if (!genAI) {
+    console.log("Using offline mock chat reply.");
+    return "Thank you for your message. Since Gemini API is currently offline/not configured, I am unable to process live legal queries. However, you can proceed by checking your local district courts or legal aid cells for direct consultation." + disclaimerText;
+  }
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
