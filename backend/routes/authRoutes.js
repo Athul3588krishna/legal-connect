@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   registerUser,
   loginUser,
+  verifyLoginOtp,
   verifyEmail,
   forgotPassword,
   resetPassword,
@@ -14,7 +15,8 @@ const upload = require('../middleware/uploadMiddleware');
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
-router.get('/verify-email/:token', verifyEmail);
+router.post('/verify-otp', verifyLoginOtp);
+router.post('/verify-email', verifyEmail);
 router.post('/forgot-password', forgotPassword);
 router.put('/reset-password/:token', resetPassword);
 

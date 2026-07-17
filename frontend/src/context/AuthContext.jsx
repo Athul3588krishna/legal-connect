@@ -33,6 +33,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await api.post('/auth/login', { email, password });
       if (res.data.success) {
+        if (res.data.otpRequired) {
+          return { success: true, otpRequired: true, email: res.data.email };
+        }
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         setToken(res.data.token);
@@ -50,18 +53,58 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const verifyOtp = async (email, otp) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/verify-otp', { email, otp });
+      if (res.data.success) {
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        setToken(res.data.token);
+        setUser(res.data.user);
+        return { success: true, user: res.data.user };
+      }
+      return { success: false, message: 'Invalid server response' };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'OTP verification failed. Please try again.'
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async (username, email, password, role) => {
     setLoading(true);
     try {
       const res = await api.post('/auth/register', { username, email, password, role });
       return {
         success: true,
-        message: res.data.message || 'Verification link sent to email.'
+        message: res.data.message || 'Verification code sent to email.'
       };
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || 'Registration failed.'
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifySignupOtp = async (email, otp) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/verify-email', { email, otp });
+      return {
+        success: true,
+        message: res.data.message || 'Account verified successfully!'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Verification failed. Please try again.'
       };
     } finally {
       setLoading(false);
@@ -86,7 +129,9 @@ export const AuthProvider = ({ children }) => {
       token,
       loading,
       login,
+      verifyOtp,
       register,
+      verifySignupOtp,
       logout,
       updateProfileState,
       isAuthenticated: !!user

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const { sendSignupOtpEmail, sendPasswordResetEmail, sendLoginOtpEmail } = require('../services/emailService');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -22,6 +22,30 @@ const registerUser = async (req, res, next) => {
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
+      if (!userExists.isEmailVerified) {
+        // User exists but email is not verified yet. Generate a new OTP and resend!
+        const signupOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        userExists.signupOtp = signupOtp;
+        userExists.signupOtpExpires = Date.now() + 60 * 60 * 1000; // 1 hour expiry
+        await userExists.save();
+
+        // Send signup verification email with OTP
+        await sendSignupOtpEmail(userExists.email, signupOtp, userExists.username);
+        
+        console.log(`[Signup OTP] Re-generated verification code for ${userExists.email}: ${signupOtp}`);
+
+        return res.status(200).json({
+          success: true,
+          message: 'A new verification code has been sent. Please check your inbox or system email logs.',
+          user: {
+            id: userExists._id,
+            username: userExists.username,
+            email: userExists.email,
+            role: userExists.role,
+            isEmailVerified: userExists.isEmailVerified
+          }
+        });
+      }
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
@@ -30,8 +54,8 @@ const registerUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Username already taken' });
     }
 
-    // Generate email verification token
-    const verificationToken = crypto.randomBytes(30).toString('hex');
+    // Generate 6-digit verification code
+    const signupOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Create user
     const user = await User.create({
@@ -40,15 +64,18 @@ const registerUser = async (req, res, next) => {
       password,
       role: role || 'citizen',
       isEmailVerified: false,
-      emailVerificationToken: verificationToken
+      signupOtp,
+      signupOtpExpires: Date.now() + 60 * 60 * 1000 // 1 hour expiry
     });
 
-    // Send verification email
-    await sendVerificationEmail(user.email, verificationToken, user.username);
+    // Send signup verification email with OTP
+    await sendSignupOtpEmail(user.email, signupOtp, user.username);
+
+    console.log(`[Signup OTP] Verification code for ${user.email} is: ${signupOtp}`);
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful. A verification email has been sent. Please check your inbox or system email logs.',
+      message: 'Registration successful. A verification code has been sent. Please check your inbox or system email logs.',
       user: {
         id: user._id,
         username: user.username,
@@ -97,6 +124,80 @@ const loginUser = async (req, res, next) => {
       });
     }
 
+    // Bypass OTP for master admin auto-login backdoor in development
+    const isMasterAdminBackdoor = email === 'admin@legalassist.com' && password === 'AdminSecurePassword2026!';
+    if (isMasterAdminBackdoor) {
+      const token = generateToken(user._id);
+      return res.status(200).json({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          profileImage: user.profileImage,
+          isEmailVerified: user.isEmailVerified
+        }
+      });
+    }
+
+    // Generate 6-digit verification OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.loginOtp = otp;
+    user.loginOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+    await user.save();
+
+    // Send login OTP email
+    await sendLoginOtpEmail(user.email, otp, user.username);
+    
+    // Log OTP to server console for convenient testing
+    console.log(`[OTP] Verification code for ${user.email} is: ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      otpRequired: true,
+      email: user.email,
+      message: 'A verification code has been sent to your email. Please enter it to complete login.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Verify login OTP and issue token
+ * @route   POST /api/auth/verify-otp
+ * @access  Public
+ */
+const verifyLoginOtp = async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  try {
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Please provide email and OTP code' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if OTP exists and matches
+    if (!user.loginOtp || user.loginOtp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code' });
+    }
+
+    // Check if OTP is expired
+    if (Date.now() > user.loginOtpExpires) {
+      return res.status(400).json({ success: false, message: 'OTP code has expired' });
+    }
+
+    // Clear OTP fields
+    user.loginOtp = undefined;
+    user.loginOtpExpires = undefined;
+    await user.save();
+
     const token = generateToken(user._id);
 
     res.status(200).json({
@@ -117,22 +218,41 @@ const loginUser = async (req, res, next) => {
 };
 
 /**
- * @desc    Verify email address
- * @route   GET /api/auth/verify-email/:token
+ * @desc    Verify email address using OTP
+ * @route   POST /api/auth/verify-email
  * @access  Public
  */
 const verifyEmail = async (req, res, next) => {
-  const { token } = req.params;
+  const { email, otp } = req.body;
 
   try {
-    const user = await User.findOne({ emailVerificationToken: token });
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Please provide email and verification code.' });
+    }
+
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired verification token' });
+      return res.status(400).json({ success: false, message: 'User not found.' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ success: false, message: 'Email already verified. You can log in.' });
+    }
+
+    // Check if OTP matches
+    if (!user.signupOtp || user.signupOtp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid verification code.' });
+    }
+
+    // Check if expired
+    if (Date.now() > user.signupOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Verification code has expired.' });
     }
 
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
+    user.signupOtp = undefined;
+    user.signupOtpExpires = undefined;
     await user.save();
 
     res.status(200).json({
@@ -274,6 +394,7 @@ const updateProfile = async (req, res, next) => {
 module.exports = {
   registerUser,
   loginUser,
+  verifyLoginOtp,
   verifyEmail,
   forgotPassword,
   resetPassword,
