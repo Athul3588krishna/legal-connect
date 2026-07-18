@@ -41,6 +41,13 @@ const userSchema = new mongoose.Schema({
   loginOtpExpires: Date,
   signupOtp: String,
   signupOtpExpires: Date,
+  availabilitySlots: [{
+    time: Date,
+    isBooked: {
+      type: Boolean,
+      default: false
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

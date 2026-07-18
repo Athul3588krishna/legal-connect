@@ -1,5 +1,6 @@
 const Complaint = require('../models/Complaint');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 /**
  * @desc    Get all consultation requests for advocates
@@ -108,7 +109,109 @@ const replyToComplaint = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get advocate's availability slots
+ * @route   GET /api/advocate/availability
+ * @access  Private (Advocate)
+ */
+const getAvailability = async (req, res, next) => {
+  try {
+    const advocate = await User.findById(req.user.id);
+    if (!advocate) {
+      return res.status(404).json({ success: false, message: 'Advocate not found' });
+    }
+
+    // Sort slots by time
+    const slots = advocate.availabilitySlots.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    res.status(200).json({ success: true, slots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Add availability slot
+ * @route   POST /api/advocate/availability
+ * @access  Private (Advocate)
+ */
+const addAvailability = async (req, res, next) => {
+  const { time } = req.body;
+  try {
+    if (!time) {
+      return res.status(400).json({ success: false, message: 'Please provide slot date/time' });
+    }
+
+    const slotTime = new Date(time);
+    if (slotTime < new Date()) {
+      return res.status(400).json({ success: false, message: 'Cannot add slot in the past' });
+    }
+
+    const advocate = await User.findById(req.user.id);
+    if (!advocate) {
+      return res.status(404).json({ success: false, message: 'Advocate not found' });
+    }
+
+    // Check if slot already exists within a 30-minute window to prevent overlaps
+    const overlap = advocate.availabilitySlots.find(s => {
+      const existingTime = new Date(s.time).getTime();
+      const diff = Math.abs(existingTime - slotTime.getTime());
+      return diff < 30 * 60 * 1000; // Less than 30 minutes difference
+    });
+
+    if (overlap) {
+      return res.status(400).json({ success: false, message: 'This slot conflicts with an existing slot (must be at least 30 mins apart).' });
+    }
+
+    advocate.availabilitySlots.push({ time: slotTime });
+    await advocate.save();
+
+    // Sort slots by time
+    const slots = advocate.availabilitySlots.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    res.status(201).json({ success: true, message: 'Availability slot added successfully', slots });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete availability slot
+ * @route   DELETE /api/advocate/availability/:slotId
+ * @access  Private (Advocate)
+ */
+const deleteAvailability = async (req, res, next) => {
+  try {
+    const advocate = await User.findById(req.user.id);
+    if (!advocate) {
+      return res.status(404).json({ success: false, message: 'Advocate not found' });
+    }
+
+    const slot = advocate.availabilitySlots.id(req.params.slotId);
+    if (!slot) {
+      return res.status(404).json({ success: false, message: 'Slot not found' });
+    }
+
+    if (slot.isBooked) {
+      return res.status(400).json({ success: false, message: 'Cannot delete a slot that is already booked' });
+    }
+
+    advocate.availabilitySlots.pull({ _id: req.params.slotId });
+    await advocate.save();
+
+    // Sort slots
+    const slots = advocate.availabilitySlots.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    res.status(200).json({ success: true, message: 'Availability slot removed successfully', slots });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAdvocateComplaints,
-  replyToComplaint
+  replyToComplaint,
+  getAvailability,
+  addAvailability,
+  deleteAvailability
 };

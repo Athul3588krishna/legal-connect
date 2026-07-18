@@ -127,6 +127,27 @@ ${complaint.citizen?.username || 'Grievant'}
 
   // FAQ accordion state
   const [faqOpen, setFaqOpen] = useState({});
+  const [advocateSlots, setAdvocateSlots] = useState({});
+
+  useEffect(() => {
+    if (complaint && complaint.advocateReplies) {
+      complaint.advocateReplies.forEach(reply => {
+        const advId = reply.advocate?._id || reply.advocate;
+        if (advId) {
+          api.get(`/advocates/${advId}/availability`)
+            .then(res => {
+              if (res.data.success) {
+                setAdvocateSlots(prev => ({
+                  ...prev,
+                  [advId]: res.data.slots
+                }));
+              }
+            })
+            .catch(err => console.error('Failed to fetch slots for advocate:', advId, err));
+        }
+      });
+    }
+  }, [complaint?.advocateReplies]);
 
   const fetchComplaintDetails = async () => {
     try {
@@ -662,13 +683,17 @@ ${complaint.citizen?.username || 'Grievant'}
                           const slot = complaint.videoSlots?.find(
                             s => s.advocate === reply.advocate?._id || s.advocate?._id === reply.advocate?._id
                           );
+                          const slotsForAdvocate = advocateSlots[reply.advocate?._id] || [];
                           return (
                             <div className="mt-3 p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-xs">
                               {!slot ? (
                                 <form onSubmit={async (e) => {
                                   e.preventDefault();
                                   const requestedTime = e.target.prefTime.value;
-                                  if (!requestedTime) return;
+                                  if (!requestedTime) {
+                                    showToast('Please select a valid availability slot.', 'error');
+                                    return;
+                                  }
                                   try {
                                     const res = await api.post(`/complaints/${complaint._id}/slots/request`, {
                                       advocateId: reply.advocate?._id,
@@ -684,16 +709,33 @@ ${complaint.citizen?.username || 'Grievant'}
                                 }} className="flex flex-col sm:flex-row sm:items-end gap-3">
                                   <div className="flex-1 space-y-1">
                                     <label className="font-bold text-[9px] text-slate-450 uppercase block mb-1">Request Live Video Consultation</label>
-                                    <input
-                                      type="datetime-local"
-                                      name="prefTime"
-                                      required
-                                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500"
-                                    />
+                                    {slotsForAdvocate.length === 0 ? (
+                                      <select
+                                        name="prefTime"
+                                        disabled
+                                        className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-400 outline-none"
+                                      >
+                                        <option value="">No availability slots posted by this advocate</option>
+                                      </select>
+                                    ) : (
+                                      <select
+                                        name="prefTime"
+                                        required
+                                        className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-primary-500/10 focus:border-primary-500"
+                                      >
+                                        <option value="">-- Choose an Available Slot --</option>
+                                        {slotsForAdvocate.map(s => (
+                                          <option key={s._id} value={s.time}>
+                                            {new Date(s.time).toLocaleString()}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
                                   </div>
                                   <button
                                     type="submit"
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow-sm shadow-indigo-500/10 transition-all cursor-pointer"
+                                    disabled={slotsForAdvocate.length === 0}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] shadow-sm shadow-indigo-500/10 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   >
                                     Book Video Slot
                                   </button>

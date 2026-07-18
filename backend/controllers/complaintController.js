@@ -321,6 +321,14 @@ const requestVideoSlot = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Advocate not found.' });
     }
 
+    // Verify chosen time matches an available unbooked slot on advocate profile
+    const slotMatch = advocate.availabilitySlots.find(
+      s => new Date(s.time).getTime() === new Date(requestedTime).getTime() && !s.isBooked
+    );
+    if (!slotMatch) {
+      return res.status(400).json({ success: false, message: 'The selected availability slot is no longer open.' });
+    }
+
     // Check if slot request already exists for this advocate and is pending/scheduled
     const existing = complaint.videoSlots.find(
       s => s.advocate.toString() === advocateId && ['pending', 'scheduled'].includes(s.status)
@@ -329,7 +337,11 @@ const requestVideoSlot = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'You already have a pending or active slot request with this advocate.' });
     }
 
-    // Add slot request
+    // Mark advocate slot as booked
+    slotMatch.isBooked = true;
+    await advocate.save();
+
+    // Add slot request to complaint dossier
     complaint.videoSlots.push({
       advocate: advocateId,
       requestedTime: new Date(requestedTime),
@@ -388,6 +400,18 @@ const scheduleVideoSlot = async (req, res, next) => {
       
       const cleanTitle = complaint.title.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20);
       slot.meetingUrl = `https://meet.jit.si/LegalAssist-Consultation-${cleanTitle}-${complaint._id}-${slot._id}`;
+    } else if (status === 'rejected') {
+      // Release slot back to available on advocate's profile
+      const advocate = await User.findById(req.user.id);
+      if (advocate) {
+        const advSlot = advocate.availabilitySlots.find(
+          s => new Date(s.time).getTime() === new Date(slot.requestedTime).getTime()
+        );
+        if (advSlot) {
+          advSlot.isBooked = false;
+          await advocate.save();
+        }
+      }
     }
 
     await complaint.save();
@@ -424,6 +448,21 @@ const deleteVideoSlot = async (req, res, next) => {
 
     if (complaint.citizen.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized to modify slots for this case.' });
+    }
+
+    const slot = complaint.videoSlots.id(req.params.slotId);
+    if (slot) {
+      // Release slot back to available on advocate's profile
+      const advocate = await User.findById(slot.advocate);
+      if (advocate) {
+        const advSlot = advocate.availabilitySlots.find(
+          s => new Date(s.time).getTime() === new Date(slot.requestedTime).getTime()
+        );
+        if (advSlot) {
+          advSlot.isBooked = false;
+          await advocate.save();
+        }
+      }
     }
 
     // Pull/remove the slot

@@ -75,4 +75,28 @@ router.get('/:advocateId/reviews', async (req, res, next) => {
   }
 });
 
+// @desc    Get public availability slots of an advocate
+// @route   GET /api/advocates/:advocateId/availability
+// @access  Private (Citizen/Advocate/Admin)
+router.get('/:advocateId/availability', protect, async (req, res, next) => {
+  const advocateId = req.params.advocateId;
+
+  try {
+    const advocate = await User.findOne({ _id: advocateId, role: 'advocate' });
+    if (!advocate) {
+      return res.status(404).json({ success: false, message: 'Advocate profile not found.' });
+    }
+
+    // Filter slots to only include future and unbooked ones
+    const now = new Date();
+    const slots = advocate.availabilitySlots
+      .filter(s => !s.isBooked && new Date(s.time) > now)
+      .sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    res.status(200).json({ success: true, slots });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
