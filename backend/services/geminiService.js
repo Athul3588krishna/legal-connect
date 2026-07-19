@@ -205,7 +205,47 @@ const getChatReply = async (history, newMessage, complaintDetails) => {
   }
 };
 
+/**
+ * Translates a structured legal guidance JSON report to a target language
+ */
+const translateReport = async (reportData, targetLanguage) => {
+  if (!genAI) {
+    console.log(`Offline: Skipping translation. Returning original English report.`);
+    return reportData;
+  }
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
+
+    const prompt = `
+      You are an expert legal translator. Translate the following legal guidance JSON report from English to the target language: "${targetLanguage}".
+      
+      Strict Rules:
+      1. Translate only the textual content of the values inside the JSON (including items in arrays).
+      2. Do NOT translate JSON keys (keep "summary", "applicableLaws", "law", "description", "suggestedAuthority", "requiredDocuments", "stepByStepProcedure", "nextActions", "preventiveTips", "faqs", "question", "answer", "disclaimer" exactly as they are).
+      3. The translated content must preserve the exact same meaning, caution, non-binding tone, and layout.
+      4. Return the result strictly in the JSON format matching the schema.
+      
+      JSON REPORT DATA TO TRANSLATE:
+      ${JSON.stringify(reportData, null, 2)}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const textResponse = result.response.text();
+    return JSON.parse(textResponse);
+  } catch (error) {
+    console.error("Gemini API Error during report translation:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   generateLegalGuidance,
-  getChatReply
+  getChatReply,
+  translateReport
 };

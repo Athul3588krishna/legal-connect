@@ -1,5 +1,5 @@
 const Complaint = require('../models/Complaint');
-const Notification = require('../models/Notification');
+const { createNotification } = require('../services/notificationService');
 const User = require('../models/User');
 
 /**
@@ -93,11 +93,11 @@ const replyToComplaint = async (req, res, next) => {
     await complaint.save();
 
     // Create Notification for the citizen
-    await Notification.create({
-      user: complaint.citizen,
-      message: `Advocate ${req.user.username} has provided legal guidance on your case: "${complaint.title}".`,
-      type: 'reply'
-    });
+    await createNotification(
+      complaint.citizen,
+      `Advocate ${req.user.username} has provided legal guidance on your case: "${complaint.title}".`,
+      'reply'
+    );
 
     res.status(200).json({
       success: true,

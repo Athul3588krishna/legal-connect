@@ -2,12 +2,15 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { ToastContext } from '../context/ToastContext';
 import api from '../services/api';
+import io from 'socket.io-client';
 import { Sun, Moon, Bell, LogOut, Menu, X, User as UserIcon, ShieldAlert } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useContext(AuthContext);
   const { toggleTheme, isDark } = useContext(ThemeContext);
+  const { showToast } = useContext(ToastContext);
   
   const [isOpen, setIsOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -45,9 +48,36 @@ const Navbar = () => {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 20000); // poll every 20s
-    return () => clearInterval(interval);
   }, [isAuthenticated]);
+
+  // Real-time Socket.io notifications
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL 
+      ? import.meta.env.VITE_API_URL.replace('/api', '') 
+      : 'http://localhost:5000';
+
+    const socket = io(socketUrl, {
+      transports: ['websocket'],
+      withCredentials: true
+    });
+
+    socket.emit('join', user.id || user._id);
+
+    socket.on('notification', (newNotification) => {
+      // Show real-time Toast
+      showToast(newNotification.message, 'info');
+
+      // Update state in real-time
+      setNotifications(prev => [newNotification, ...prev]);
+      setUnreadCount(prev => prev + 1);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isAuthenticated, user]);
 
   const markAsRead = async (id) => {
     try {

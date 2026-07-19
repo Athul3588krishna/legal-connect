@@ -37,6 +37,39 @@ const ComplaintDetail = () => {
   const [sendingChat, setSendingChat] = useState(false);
   const chatEndRef = useRef(null);
 
+  // Translation States
+  const [activeLanguage, setActiveLanguage] = useState('en');
+  const [translatedReport, setTranslatedReport] = useState(null);
+  const [translating, setTranslating] = useState(false);
+
+  const handleLanguageToggle = async (lang) => {
+    if (lang === 'en') {
+      setActiveLanguage('en');
+      return;
+    }
+
+    if (translatedReport) {
+      setActiveLanguage('ml');
+      return;
+    }
+
+    setTranslating(true);
+    try {
+      const res = await api.post(`/complaints/${id}/translate`, {
+        targetLanguage: 'Malayalam'
+      });
+      if (res.data.success && res.data.translated) {
+        setTranslatedReport(res.data.translated);
+        setActiveLanguage('ml');
+        showToast('Legal Report translated to Malayalam.', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to translate report.', 'error');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const fetchAdvocateRating = async (advocateId) => {
     try {
       const res = await api.get(`/advocates/${advocateId}/reviews`);
@@ -258,7 +291,7 @@ ${complaint.citizen?.username || 'Grievant'}
     );
   }
 
-  const ai = complaint.aiResponse;
+  const ai = activeLanguage === 'ml' && translatedReport ? translatedReport : complaint.aiResponse;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fade-in">
@@ -327,37 +360,74 @@ ${complaint.citizen?.username || 'Grievant'}
       </div>
 
       {/* Tabs Menu */}
-      <div className="border-b border-slate-200 dark:border-slate-800 flex gap-2">
-        <button
-          onClick={() => setActiveTab('ai_guide')}
-          className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 ${
-            activeTab === 'ai_guide'
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          AI Guidance Report
-        </button>
-        <button
-          onClick={() => setActiveTab('chat')}
-          className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 flex items-center gap-1.5 ${
-            activeTab === 'chat'
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          AI Chat Assistant
-        </button>
-        <button
-          onClick={() => setActiveTab('advocate_replies')}
-          className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 flex items-center gap-1.5 ${
-            activeTab === 'advocate_replies'
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          Advocate Advice ({complaint.advocateReplies?.length || 0})
-        </button>
+      <div className="border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveTab('ai_guide')}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 ${
+              activeTab === 'ai_guide'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            AI Guidance Report
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 flex items-center gap-1.5 ${
+              activeTab === 'chat'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            AI Chat Assistant
+          </button>
+          <button
+            onClick={() => setActiveTab('advocate_replies')}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all px-4 flex items-center gap-1.5 ${
+              activeTab === 'advocate_replies'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+            }`}
+          >
+            Advocate Advice ({complaint.advocateReplies?.length || 0})
+          </button>
+        </div>
+
+        {activeTab === 'ai_guide' && (
+          <div className="pb-3 flex items-center gap-2 text-xs">
+            <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block">Report Language:</span>
+            <div className="flex p-0.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900 text-[10px] font-bold shadow-sm">
+              <button
+                type="button"
+                onClick={() => handleLanguageToggle('en')}
+                disabled={translating}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  activeLanguage === 'en'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                }`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLanguageToggle('ml')}
+                disabled={translating}
+                className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeLanguage === 'ml'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                }`}
+              >
+                {translating && (
+                  <span className="w-2.5 h-2.5 border border-slate-400 border-t-transparent rounded-full animate-spin inline-block"></span>
+                )}
+                മലയാളം
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Panels */}

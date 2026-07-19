@@ -1,5 +1,5 @@
 const Complaint = require('../models/Complaint');
-const Notification = require('../models/Notification');
+const { createNotification } = require('../services/notificationService');
 const User = require('../models/User');
 const geminiService = require('../services/geminiService');
 const pdfService = require('../services/pdfService');
@@ -73,20 +73,20 @@ const submitComplaint = async (req, res, next) => {
     await complaint.save();
 
     // Create Notification for the citizen
-    await Notification.create({
-      user: req.user.id,
-      message: `Your complaint "${title}" has been submitted and analysed by AI. View your dashboard for the legal guide.`,
-      type: 'complaint'
-    });
+    await createNotification(
+      req.user.id,
+      `Your complaint "${title}" has been submitted and analysed by AI. View your dashboard for the legal guide.`,
+      'complaint'
+    );
 
     // Create Notification for all admins
     const admins = await User.find({ role: 'admin' });
     for (const admin of admins) {
-      await Notification.create({
-        user: admin._id,
-        message: `New citizen complaint submitted: "${title}" in ${district}, ${state}.`,
-        type: 'complaint'
-      });
+      await createNotification(
+        admin._id,
+        `New citizen complaint submitted: "${title}" in ${district}, ${state}.`,
+        'complaint'
+      );
     }
 
     res.status(201).json({
@@ -284,11 +284,11 @@ const downloadPdfReport = async (req, res, next) => {
     pdfService.generateComplaintPDF(complaint, res);
 
     // Create Notification about PDF report generation
-    await Notification.create({
-      user: complaint.citizen._id,
-      message: `Your legal report for case "${complaint.title}" has been successfully exported as PDF.`,
-      type: 'report'
-    });
+    await createNotification(
+      complaint.citizen._id,
+      `Your legal report for case "${complaint.title}" has been successfully exported as PDF.`,
+      'report'
+    );
   } catch (error) {
     next(error);
   }
@@ -351,11 +351,11 @@ const requestVideoSlot = async (req, res, next) => {
     await complaint.save();
 
     // Notify the advocate
-    await Notification.create({
-      user: advocateId,
-      message: `Citizen ${req.user.username} has requested a video consultation slot for case: "${complaint.title}".`,
-      type: 'complaint'
-    });
+    await createNotification(
+      advocateId,
+      `Citizen ${req.user.username} has requested a video consultation slot for case: "${complaint.title}".`,
+      'complaint'
+    );
 
     res.status(201).json({ success: true, message: 'Consultation slot request submitted to advocate.', slots: complaint.videoSlots });
   } catch (error) {
@@ -422,11 +422,11 @@ const scheduleVideoSlot = async (req, res, next) => {
       ? `Advocate ${req.user.username} has confirmed your video consultation for ${formattedDate}.`
       : `Advocate ${req.user.username} has declined your video consultation request.`;
 
-    await Notification.create({
-      user: complaint.citizen,
-      message: alertMessage,
-      type: 'reply'
-    });
+    await createNotification(
+      complaint.citizen,
+      alertMessage,
+      'reply'
+    );
 
     res.status(200).json({ success: true, message: `Video call request ${status}.`, slots: complaint.videoSlots });
   } catch (error) {
@@ -506,13 +506,42 @@ const payConsultationFee = async (req, res, next) => {
     await complaint.save();
 
     // Create Notification
-    await Notification.create({
-      user: complaint.citizen,
-      message: `Payment of ₹${reply.consultationFee} successfully processed for Advocate consultation. Receipt ID: ${reply.transactionId}`,
-      type: 'reply'
-    });
+    await createNotification(
+      complaint.citizen,
+      `Payment of ₹${reply.consultationFee} successfully processed for Advocate consultation. Receipt ID: ${reply.transactionId}`,
+      'reply'
+    );
 
     res.status(200).json({ success: true, message: 'Payment successfully simulated!', complaint });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Translate case dossier's AI response report
+ * @route   POST /api/complaints/:id/translate
+ * @access  Private
+ */
+const translateComplaintReport = async (req, res, next) => {
+  const { targetLanguage } = req.body;
+  try {
+    if (!targetLanguage) {
+      return res.status(400).json({ success: false, message: 'Please specify a target language.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Complaint not found.' });
+    }
+
+    if (!complaint.aiResponse) {
+      return res.status(400).json({ success: false, message: 'No AI guidance report exists to translate.' });
+    }
+
+    const translated = await geminiService.translateReport(complaint.aiResponse, targetLanguage);
+
+    res.status(200).json({ success: true, translated });
   } catch (error) {
     next(error);
   }
@@ -527,5 +556,6 @@ module.exports = {
   requestVideoSlot,
   scheduleVideoSlot,
   deleteVideoSlot,
-  payConsultationFee
+  payConsultationFee,
+  translateComplaintReport
 };

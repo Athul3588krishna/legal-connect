@@ -59,9 +59,57 @@ if (process.env.NODE_ENV === 'production') {
 // Global Error Handler Middleware
 app.use(errorHandler);
 
+const http = require('http');
+const socketio = require('socket.io');
+
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+// Wrap express app in HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = socketio(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  }
+});
+
+const { initNotificationSocket } = require('./services/notificationService');
+initNotificationSocket(io);
+
+// Map of userId -> socketId
+const userSockets = new Map();
+
+io.on('connection', (socket) => {
+  console.log(`[Socket] Client connected: ${socket.id}`);
+
+  // Register user room
+  socket.on('join', (userId) => {
+    if (userId) {
+      socket.join(userId);
+      userSockets.set(userId, socket.id);
+      console.log(`[Socket] User ${userId} joined room.`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] Client disconnected: ${socket.id}`);
+    for (const [userId, socketId] of userSockets.entries()) {
+      if (socketId === socket.id) {
+        userSockets.delete(userId);
+        break;
+      }
+    }
+  });
+});
+
+// Expose socket references
+app.set('io', io);
+app.set('userSockets', userSockets);
+
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 

@@ -9,7 +9,8 @@ const {
   requestVideoSlot,
   scheduleVideoSlot,
   deleteVideoSlot,
-  payConsultationFee
+  payConsultationFee,
+  translateComplaintReport
 } = require('../controllers/complaintController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -20,6 +21,9 @@ router.route('/')
 
 router.route('/:id')
   .get(protect, getComplaintById);
+
+router.route('/:id/translate')
+  .post(protect, translateComplaintReport);
 
 router.route('/:id/chat')
   .post(protect, authorize('citizen'), askFollowUp);

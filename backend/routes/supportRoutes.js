@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Support = require('../models/Support');
-const Notification = require('../models/Notification');
+const { createNotification } = require('../services/notificationService');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -20,11 +20,11 @@ router.post('/', async (req, res, next) => {
     // Send notifications to all Admins about new support ticket
     const admins = await User.find({ role: 'admin' });
     for (const admin of admins) {
-      await Notification.create({
-        user: admin._id,
-        message: `New support inquiry: "${subject}" submitted by ${name}.`,
-        type: 'complaint'
-      });
+      await createNotification(
+        admin._id,
+        `New support inquiry: "${subject}" submitted by ${name}.`,
+        'complaint'
+      );
     }
 
     res.status(201).json({ 
